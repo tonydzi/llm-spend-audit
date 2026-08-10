@@ -147,13 +147,8 @@ def session_starts(days=14, root=None):
     """
     rows = []
     for ts, path in T.transcript_files(root, days=days, min_bytes=5 * 1024):
-        for rec in T.records(path, needle='"usage"'):
-            if rec.get("type") != "assistant":
-                continue
-            msg = rec.get("message")
-            if not isinstance(msg, dict):
-                continue
-            total = T.context_tokens(msg.get("usage"))
+        for message in T.scan_session(path)["messages"]:
+            total = T.context_tokens(message["usage"])
             if total > 0:
                 rows.append((ts, total, os.path.basename(path)))
                 break
@@ -178,7 +173,11 @@ def cmd_calibrate(args):
         print(json.dumps(cal, ensure_ascii=False, indent=2))
         return 0
     print("TOKEN COUNTER CALIBRATION")
-    print("  pure-text replies examined : %d" % cal.get("examined", 0))
+    # Examined is not the same as used: a reply that mixes scripts cannot tell the two
+    # rates apart, so it is counted as looked-at and then dropped. Printing only the
+    # bigger number would overstate the evidence behind the rates below.
+    print("  pure-text replies examined : %d  (used: %d Cyrillic + %d Latin, the rest were mixed)"
+          % (cal.get("examined", 0), cal.get("n_cyrillic", 0), cal.get("n_other", 0)))
     print("  Cyrillic   : %s chars/token  (n=%d, spread %s)"
           % (cal["cyrillic_chars_per_token"], cal.get("n_cyrillic", 0),
              cal.get("cyrillic_spread", "-")))
@@ -247,13 +246,10 @@ def cmd_daily(args):
         day = per_day.setdefault(ts.strftime("%Y-%m-%d"),
                                  {"sessions": 0, "output": 0, "cache_new": 0, "cache_read": 0})
         day["sessions"] += 1
-        for rec in T.records(path, needle='"usage"'):
-            msg = rec.get("message")
-            if not isinstance(msg, dict):
-                continue
-            usage = msg.get("usage")
-            if not isinstance(usage, dict):
-                continue
+        # Per MESSAGE, not per record: the usage object is repeated across a message's
+        # records, and summing it inflated our own output figures by 2.58x.
+        for message in T.scan_session(path)["messages"]:
+            usage = message["usage"]
             day["output"] += T.num(usage, "output_tokens")
             day["cache_new"] += T.num(usage, "cache_creation_input_tokens")
             day["cache_read"] += T.num(usage, "cache_read_input_tokens")

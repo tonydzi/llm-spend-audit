@@ -27,15 +27,32 @@ Tested three ways in `tests/test_kit.py::TestCalibration`: the true rate on clea
 poisoned messages excluded, and duplicate records not summed. Remove the fix and the third
 one goes red immediately.
 
+**And it bites a second time, further downstream.** We fixed the calibration, shipped, and
+an external review panel then found the same trap alive in both aggregators: the day
+report and the daily table were summing `usage` per record. Measured on real transcripts,
+1672 usage records covered 746 distinct messages, and output tokens came out **2.58x**
+too high. A carried-context table also counted a 324-turn session as 800-odd turns and
+therefore ranked the wrong sessions as expensive.
+
+Every aggregate now goes through `transcripts.merge_usage()` and `transcripts.scan_session()`,
+which return one entry per message. If you take a number out of a transcript, ask yourself
+whether your loop is over records or over messages. It is almost always meant to be
+messages.
+
 ## 2. Numbers in a file you did not write are not numbers
 
 One record carried `usage={"input_tokens": "x"}`. That raised `TypeError`, an outer
 `except` swallowed it, and the **entire session** dropped out of the report. Silent data
 loss that looks exactly like a quiet day.
 
-Every numeric read goes through `transcripts.num()`, which returns 0 for strings, `None`
-and booleans alike. Booleans matter: `True` is an `int` in Python, so a sloppy check counts
-it as one token.
+Every numeric read goes through `transcripts.num()`. It returns 0 for `None`, for
+booleans and for unparseable strings, and it **coerces** a numeric string like `"123"`
+rather than dropping it. Both directions are silent data loss: crashing on `"x"` loses a
+session, and quietly zeroing `"123"` reports spend that really happened as nothing. The
+second one was caught by an external reviewer, not by us.
+
+Booleans matter separately: `True` is an `int` in Python, so a sloppy check counts it as
+one token.
 
 ## 3. Transcript timestamps are UTC, your audit day is local
 
@@ -66,8 +83,9 @@ caught it on the first run.
 
 Our first carried-context threshold fired on 49 of 147 sessions. Daily red is the same as
 no alarm. Measure your own distribution, put the line near the outliers, and re-measure
-once a quarter. The defaults in `spend_audit.example.json` are ours, and they are labelled
-as such.
+once a quarter. The defaults in `spend_audit.example.json` are ours, they are labelled as
+such, and they were derived **before** the per-message fix in gotcha 1, so on corrected
+numbers they sit higher than they should. Take your own.
 
 Same reason a session gets **one** flag, not one per rule it trips, and only the worst
 three are reported. Twelve near-identical alerts about one fact is how an alert channel

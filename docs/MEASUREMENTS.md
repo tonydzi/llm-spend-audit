@@ -14,6 +14,7 @@ borrowed threshold is a noise generator (see GOTCHAS 5).
 | Cyrillic, machine A | 2.17 chars/token | 445 pure-text replies |
 | Cyrillic, machine B | 2.17 chars/token | 698 pure-text replies |
 | Cyrillic, re-run on machine A, 2026-08-10 | 2.176 chars/token | 693 pure-text replies |
+| the same, 7-day window | 2.174 chars/token | 379 pure-text replies |
 
 Two machines with different workloads landed on the same rate independently, and a re-run
 five days later reproduced it. That agreement is what convinced us the message-id grouping
@@ -66,8 +67,13 @@ Seven days on the hub, output tokens by kind of work:
 | reading files | 12.4% |
 | **pure mechanics, total** | **82%** |
 
-Total output over that window: 36.8M tokens. Meanwhile the cheap paid coding rail sat at
-**4%** of its allowance, and two other paid rails had never been measured at all.
+Meanwhile the cheap paid coding rail sat at **4%** of its allowance, and two other paid
+rails had never been measured at all.
+
+The absolute total from that window is deliberately not quoted. It was taken with a
+per-record counter, before the double-count was found, so the shares above are sound and
+the total would be inflated by up to 2.6x. A share of a wrong total is still the right
+share; a wrong total presented as measured is the thing this repo exists to stop.
 
 That is the whole argument in one table. The expensive orchestrator was doing shell and
 file reads, which is the least judgement-dependent work in the stack, while the buckets we
@@ -83,13 +89,18 @@ burns. "The orchestrator, because that is what was running" is a design defect.
 
 | what | value |
 |---|---|
-| total | 603.6M tokens |
-| live interactive work | 255.4M (42%) over 29 sessions |
-| background | 348.2M (58%) |
-| largest background consumer | 182.0M over **131** headless one-shot sessions |
-| carried context, 24h | 1,742M re-read across 245 sessions |
-| sessions that never called a single tool | 197 of 245, holding 31% of the re-read context |
+| total | 292.4M tokens |
+| live interactive work | 118.7M (41%) over 29 sessions |
+| background | 173.7M (59%) |
+| largest background consumer | 91.3M over **131** headless one-shot sessions |
+| carried context, 24h | 863M re-read across 247 sessions |
+| sessions that never called a single tool | 198 of 247, holding 35% of the re-read context |
+
+These are the **corrected** figures. The first run of the same day reported 603.6M and
+1,742M, because the aggregators were still summing usage per record rather than per
+message. The ratios barely moved; the absolutes roughly halved. Left here on purpose, as
+a reminder of how confident a wrong number looks.
 
 The 131-session line is the finding no dashboard was going to hand us: something firing
-per tick was opening a full model session each time. And 197 sessions carried tool
+per tick was opening a full model session each time. And 198 sessions carried tool
 descriptions they never once used.

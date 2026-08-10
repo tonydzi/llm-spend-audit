@@ -270,6 +270,14 @@ def read_vendor_rate_limit(sessions_glob, max_files=40):
 
 def cmd_snap_codex(args):
     cfg = load_config(args.config)
+    # A reading recorded against a vendor that is not in the roster is stored and then
+    # never shown by report or audit. The user believes the rail is measured; nothing
+    # says otherwise. Refuse loudly instead, exactly as `declare` does.
+    known = {r["vendor"] for r in cfg["rails"]}
+    if args.vendor not in known:
+        sys.stderr.write("unknown vendor %r, so this reading would be recorded and never "
+                         "reported. Configured: %s\n" % (args.vendor, ", ".join(sorted(known))))
+        return 2
     pattern = args.glob or cfg.get("vendor_transcripts", {}).get(args.vendor) \
         or os.path.join("~", ".codex", "sessions", "**", "rollout-*.jsonl")
     limits = read_vendor_rate_limit(pattern)

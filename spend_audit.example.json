@@ -4,6 +4,8 @@
     "MEASURE YOUR OWN DISTRIBUTION BEFORE COPYING THESE NUMBERS. Ours came from the 95th",
     "percentile of one real day on one machine. A threshold that fires on a third of your",
     "sessions is a threshold you will mute within a week, and then it protects nothing.",
+    "The numbers below also predate a fix that stopped double-counting usage records, so",
+    "on corrected figures they sit higher than they should. One more reason to take your own.",
     "should_not_run: names of scheduled tasks you believe are DISABLED. If one of them",
     "shows up burning tokens, that is the loudest finding this tool can produce, and it",
     "is the finding nothing else in the stack will give you."

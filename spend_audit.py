@@ -104,26 +104,15 @@ def parse_day(date, root=None):
     for ts, path in T.transcript_files(root):
         if ts.strftime("%Y-%m-%d") not in mtimes:
             continue
-        tokens, user_turns, first_user, task = 0, 0, "", ""
-        for rec in T.records(path):
-            msg = rec.get("message")
-            if not isinstance(msg, dict):
-                continue
-            usage = msg.get("usage")
-            stamp = rec.get("timestamp", "")
-            if isinstance(usage, dict) and lo <= stamp < hi:
-                tokens += (T.context_tokens(usage) + T.num(usage, "output_tokens"))
-            if msg.get("role") == "user":
-                text = T.user_text(msg).strip()
-                if text:
-                    task = task or T.scheduled_task_name(text)
-                    if not text.startswith("<"):
-                        user_turns += 1
-                        first_user = first_user or text
+        session = T.scan_session(path)
+        # One entry per MESSAGE, never per record. Summing per record inflated this by
+        # 2.58x on our own transcripts, which is the exact trap this kit is about.
+        tokens = sum(T.context_tokens(m["usage"]) + T.num(m["usage"], "output_tokens")
+                     for m in session["messages"] if lo <= m["ts"] < hi)
         if tokens <= 0:
             continue
         total += tokens
-        key = classify(task, user_turns, first_user)
+        key = classify(session["task"], session["user_turns"], session["first_user"])
         by_source[key][0] += tokens
         by_source[key][1] += 1
     return by_source, total
@@ -150,37 +139,20 @@ def scan_sessions(hours=24, root=None):
                 continue
         except OSError:
             continue
-        prefix = None
-        turns = cache_read = total = 0
-        tools, task = set(), ""
-        for rec in T.records(path):
-            msg = rec.get("message")
-            if not isinstance(msg, dict):
-                continue
-            usage = msg.get("usage")
-            if isinstance(usage, dict):
-                turns += 1
-                shipped = T.context_tokens(usage)
-                if prefix is None:
-                    prefix = shipped
-                cache_read += T.num(usage, "cache_read_input_tokens")
-                total += shipped + T.num(usage, "output_tokens")
-            content = msg.get("content")
-            if isinstance(content, list):
-                for block in content:
-                    if not isinstance(block, dict):
-                        continue
-                    name = str(block.get("name", ""))
-                    if block.get("type") == "tool_use" and name.startswith("mcp__"):
-                        parts = name.split("__")
-                        if len(parts) > 1:
-                            tools.add(parts[1])
-            if not task and msg.get("role") == "user":
-                task = T.scheduled_task_name(T.user_text(msg))
-        if turns:
-            out.append({"prefix": prefix or 0, "turns": turns, "cache_read": cache_read,
-                        "total": total, "servers": sorted(tools), "task": task,
-                        "file": os.path.basename(path)[:8]})
+        session = T.scan_session(path)
+        messages = session["messages"]
+        if not messages:
+            continue
+        # A "turn" is a MESSAGE, not a transcript record. Counting records would report a
+        # 400-turn session as 1000 turns and rank the wrong sessions as the expensive ones.
+        out.append({"prefix": T.context_tokens(messages[0]["usage"]),
+                    "turns": len(messages),
+                    "cache_read": sum(T.num(m["usage"], "cache_read_input_tokens")
+                                      for m in messages),
+                    "total": sum(T.context_tokens(m["usage"])
+                                 + T.num(m["usage"], "output_tokens") for m in messages),
+                    "servers": session["servers"], "task": session["task"],
+                    "file": os.path.basename(path)[:8]})
     return out
 
 

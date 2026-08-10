@@ -24,9 +24,13 @@ Seven days of our own output tokens, broken down by kind of work:
 | reading files | 12.4% |
 | **pure mechanics** | **82%** |
 
-36.8M output tokens, 82% of it mechanical, all of it on the most expensive model in the
-building. Meanwhile the cheap coding subscription we were already paying for sat at **4%**
-of its allowance, and two other paid rails had never been measured at all.
+82% of it mechanical, all of it on the most expensive model in the building. Meanwhile the
+cheap coding subscription we were already paying for sat at **4%** of its allowance, and
+two other paid rails had never been measured at all.
+
+We quote the shares and not the absolute total on purpose: that split was taken with a
+per-record counter, before we found the double-count described further down, so the
+proportions hold but the total would be inflated. Saying so is cheaper than being caught.
 
 Nobody decided this. The model already holding the conversation is always the path of
 least resistance, and no dashboard anywhere was going to say so out loud.
@@ -59,10 +63,10 @@ Real output from our hub, on our own always-loaded rules file:
 ```
 RENT FOR A PERMANENT CONTEXT ADDITION: CLAUDE.md
   characters      : 79 313
-  tokens per run  : ~33 815
+  tokens per run  : ~33 805
   sessions/day    : 185 (measured over 14 days)
-  per month       : ~187 673 250 tokens
-  share of a session start: 34.504%  (median start 98 002)
+  per month       : ~187 617 750 tokens
+  share of a session start: 34.494%  (median start 98 002)
 ```
 
 One file, a third of every session start. The number that changes minds is not tokens per
@@ -82,18 +86,18 @@ long session re-ships its whole preamble on every single turn.
 Findings from one real day of ours:
 
 ```
-total 603.6M | live 255.4M (42%) | background 348.2M (58%)
-CARRIED CONTEXT over 24h: 245 sessions, 1742.3M re-read
-  sessions that never called a single MCP tool: 197 (536.6M, 31% of it)
+total 292.4M | live 118.7M (41%) | background 173.7M (59%)
+CARRIED CONTEXT over 24h: 247 sessions, 863.4M re-read
+  sessions that never called a single MCP tool: 198 (301.4M, 35% of it)
 
 FINDINGS:
-  - CRITICAL: 'headless one-shot' started 131 sessions in one day and burned 182.0M
-  - background is 58% of all tokens, more than your live work
-  - session 'b3366aab': 198.6M of re-read context over 1042 turns at prefix 81324
+  - CRITICAL: 'headless one-shot' started 131 sessions in one day and burned 91.3M
+  - 'task:voice-dispatcher' fired 5 times in one day (14.0M)
+  - background is 59% of all tokens, more than your live work
 SEVERITY=RED
 ```
 
-Something firing per tick was opening a full model session each time. 197 sessions carried
+Something firing per tick was opening a full model session each time. 198 sessions carried
 tool descriptions they never once used. Ends with `SEVERITY=` and `FLAGS=` lines so a
 watchdog can branch without parsing prose.
 
@@ -137,6 +141,12 @@ The fix is two lines. Group by `message.id`, keep only messages whose content bl
 all `text`. After it, two machines with different workloads independently measured the same
 2.17 characters per token, and a re-run five days later reproduced it.
 
+And it bites twice. We fixed it in the calibration, then an external review panel found
+the same trap still alive in the two aggregators, where summing per record inflated our own
+output figures by **2.58x** (1672 usage records covered 746 distinct messages on real
+transcripts). Every number in this README was recomputed after that fix, and the fix has a
+test that goes red if anyone takes it out.
+
 That is in [`docs/GOTCHAS.md`](docs/GOTCHAS.md) along with ten more traps, including the
 one where `age or 999` silently excluded today's readings, which is the only day a
 same-day conflict can live in.
@@ -147,7 +157,7 @@ same-day conflict can live in.
 git clone https://github.com/tonydzi/llm-spend-audit.git
 cd llm-spend-audit
 python session_tax.py calibrate          # nothing else to install
-python tests/test_kit.py                 # 30 tests, ~0.05s, no network
+python tests/test_kit.py                 # 36 tests, ~0.06s, no network
 ```
 
 The tools read `~/.claude/projects/**/*.jsonl` by default. Point them elsewhere with

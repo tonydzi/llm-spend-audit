@@ -195,6 +195,23 @@ class TestBrokenInput(Fixture):
         self.assertEqual(T.num({"input_tokens": "x"}, "input_tokens"), 0)
         self.assertEqual(T.num({"a": True}, "a"), 0, "True must not count as 1 token")
 
+    def test_numeric_strings_are_coerced_not_dropped(self):
+        """Dropping "123" reports spend that really happened as zero, which is the same
+        silent data loss as crashing on "x", just pointing the other way."""
+        self.assertEqual(T.num({"t": "123"}, "t"), 123)
+        self.assertEqual(T.num({"t": "12.5"}, "t"), 12.5)
+        self.assertEqual(T.num({"t": ""}, "t"), 0)
+        self.assertEqual(T.num({"t": None}, "t"), 0)
+        self.assertEqual(T.num(None, "t"), 0)
+
+    def test_largest_output_tokens_wins_across_records(self):
+        """A partial record carrying a lower interim count must not shrink the message."""
+        low = assistant("m1", CYR_TEXT, 10)
+        high = assistant("m1", CYR_TEXT, CYR_TOKENS)
+        path = self.write("partial.jsonl", [high, low])          # low arrives LAST
+        msgs = T.assistant_messages(path)
+        self.assertEqual(msgs["m1"]["tokens"], CYR_TOKENS, "a later partial record won")
+
     def test_session_with_no_text_messages(self):
         rec = assistant("t1", "", 90, kinds=("tool_use",))
         self.write("tools-only.jsonl", [rec, rec])
@@ -203,6 +220,15 @@ class TestBrokenInput(Fixture):
         rows = spend_audit.scan_sessions(hours=48)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["servers"], ["demo"])
+
+    def test_null_timestamp_does_not_kill_the_day(self):
+        """`"timestamp": null` makes .get(k, "") return None, and `lo <= None` raises."""
+        rec = assistant("n1", LAT_TEXT, 100)
+        rec["timestamp"] = None
+        self.write("nullts.jsonl", [rec])
+        session = T.scan_session(os.path.join(self.project, "nullts.jsonl"))
+        self.assertEqual(session["messages"][0]["ts"], "")
+        self.assertEqual(spend_audit.main(["--date", "2026-08-06"]), 0)
 
     def test_bad_date_is_usage_error_not_crash(self):
         self.assertEqual(spend_audit.main(["--date", "yesterday"]), 2)
@@ -245,20 +271,58 @@ class TestSpendAudit(Fixture):
 
     def test_carried_context_ranks_by_reread_not_output(self):
         """A cheap-looking session that re-reads a huge prefix every turn is the expensive one."""
-        big = assistant("b", LAT, 10)
-        big["message"]["usage"] = {"output_tokens": 10, "input_tokens": 0,
-                                   "cache_creation_input_tokens": 0,
-                                   "cache_read_input_tokens": 90000}
-        loud = assistant("l", LAT, 9000)
-        loud["message"]["usage"] = {"output_tokens": 9000, "input_tokens": 100,
-                                    "cache_creation_input_tokens": 0,
-                                    "cache_read_input_tokens": 100}
-        self.write("quiet.jsonl", [big] * 20)
-        self.write("loud.jsonl", [loud] * 2)
+        # Distinct message ids: twenty real turns, not one turn written twenty times.
+        def quiet(i):
+            rec = assistant("q%d" % i, LAT, 10)
+            rec["message"]["usage"] = {"output_tokens": 10, "input_tokens": 0,
+                                       "cache_creation_input_tokens": 0,
+                                       "cache_read_input_tokens": 90000}
+            return rec
+
+        def loud(i):
+            rec = assistant("d%d" % i, LAT, 9000)
+            rec["message"]["usage"] = {"output_tokens": 9000, "input_tokens": 100,
+                                       "cache_creation_input_tokens": 0,
+                                       "cache_read_input_tokens": 100}
+            return rec
+
+        self.write("quiet.jsonl", [quiet(i) for i in range(20)])
+        self.write("loud.jsonl", [loud(i) for i in range(2)])
         rows = spend_audit.scan_sessions(hours=48)
         rows.sort(key=lambda r: r["cache_read"], reverse=True)
         self.assertEqual(rows[0]["turns"], 20)
         self.assertEqual(rows[0]["cache_read"], 1800000)
+
+    def test_aggregates_per_message_not_per_record(self):
+        """The bug this whole kit warns about, once present in the kit itself.
+
+        The usage object is repeated in every record of a message. Summing per record
+        inflated output tokens by 2.58x on our real transcripts. An external reviewer
+        caught it in spend_audit and daily after we had already fixed it in calibrate.
+        """
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        one = assistant("m1", LAT_TEXT, 500, ts=now)          # output 500, context 6000
+        self.write("repeated.jsonl", [one, dict(one), dict(one), dict(one)])
+
+        rows = spend_audit.scan_sessions(hours=48)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["turns"], 1, "four records of one message counted as four turns")
+        self.assertEqual(rows[0]["cache_read"], 3000, "cache read was summed per record")
+        self.assertEqual(rows[0]["total"], 6500, "the message was billed four times")
+
+        _, _, _, by_source, total = spend_audit.build_report(
+            datetime.date.today().isoformat(), 24, dict(spend_audit.DEFAULTS))
+        self.assertEqual(total, 6500, "day total counted repeated usage records")
+
+    def test_records_without_an_id_are_never_merged(self):
+        """Two distinct messages that both lack an id must not collapse into one."""
+        a, b = assistant("", LAT_TEXT, 100), assistant("", LAT_TEXT, 200)
+        for rec in (a, b):
+            rec["message"].pop("id")
+        path = self.write("noid.jsonl", [a, b])
+        session = T.scan_session(path)
+        self.assertEqual(len(session["messages"]), 2)
 
     def test_utc_window_covers_a_full_local_day(self):
         lo, hi = spend_audit.utc_window("2026-08-06")
@@ -378,6 +442,14 @@ class TestRailUtilization(Fixture):
         got = rail_utilization.read_vendor_rate_limit(os.path.join(self.state, "rollout-*.jsonl"))
         self.assertEqual(got["used_percent"], 90.0)
         self.assertEqual(got["slot"], "secondary")
+
+    def test_snapping_an_unknown_vendor_is_refused(self):
+        """Otherwise the reading is stored, never reported, and the rail looks measured."""
+        cfg_path = self._config([])
+        args = type("A", (), {"config": cfg_path, "vendor": "not-in-roster",
+                              "glob": "", "max_age": 3})()
+        self.assertEqual(rail_utilization.cmd_snap_codex(args), 2)
+        self.assertEqual(rail_utilization._load_state()["readings"], [])
 
     def test_missing_rate_limits_is_not_an_empty_bucket(self):
         self.assertIsNone(rail_utilization.read_vendor_rate_limit(
