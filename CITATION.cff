@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use llm-spend-audit in research or software, please cite it as below."
+title: "llm-spend-audit"
+type: software
+authors:
+  - family-names: Dziatkovskii
+    given-names: Anton
+    orcid: "https://orcid.org/0000-0001-7408-3054"
+    affiliation: "Palo Alto AI Research Lab"
+repository-code: "https://github.com/tonydzi/llm-spend-audit"
+url: "https://github.com/tonydzi/llm-spend-audit"
+license: MIT
+abstract: >-
+  Three deterministic instruments for the standing rent an agent setup charges before it
+  does any work: the preamble cost of starting a session, who burned the day's tokens
+  split between live work and background services, and whether subscriptions already paid
+  for are going undrawn. No LLM call, no network, no API key, no dependencies. It reads the
+  transcripts the harness already wrote and does arithmetic on them. Documents the trap
+  that makes naive calibration impossible: output_tokens is charged for the whole assistant
+  message including thinking and tool calls, and the same usage object is repeated in every
+  transcript record of that message, which inflated the project's own aggregates by 2.58x
+  until it was found and locked behind a test.
+keywords:
+  - llm
+  - token-accounting
+  - cost-analysis
+  - observability
+  - claude-code
+  - finops
