@@ -1,0 +1,40 @@
+{
+  "_comment": [
+    "Copy to rails.json and put YOUR plans here. The dollar figures below are illustrative.",
+    "engines: the names your own call log writes for this vendor. Two entries are common:",
+    "one for the vendor, one for its CLI. Getting this wrong is the bug that makes a live",
+    "rail print as zero calls and pushes you to cancel a plan you actually use.",
+    "usage_logs: JSONL files your tooling writes, at minimum {\"ts\": <epoch>, \"engine\": \"...\"}.",
+    "List every log. Reading only one of two copies once undercounted a rail by half."
+  ],
+  "rails": [
+    {
+      "vendor": "orchestrator",
+      "plan": "top-tier assistant plan",
+      "usd_month": 200,
+      "engines": ["orchestrator"],
+      "role": "live dialogue, judgement, orchestration"
+    },
+    {
+      "vendor": "coder",
+      "plan": "coding CLI plan",
+      "usd_month": 20,
+      "engines": ["coder", "coder-cli"],
+      "role": "shell, code, mechanical work, second opinion"
+    },
+    {
+      "vendor": "researcher",
+      "plan": "research assistant plan",
+      "usd_month": 20,
+      "engines": ["researcher"],
+      "role": "deep research, long reading"
+    }
+  ],
+  "usage_logs": [
+    "~/.myagent/usage.jsonl",
+    "~/.myagent/tools/usage.jsonl"
+  ],
+  "vendor_transcripts": {
+    "coder": "~/.codex/sessions/**/rollout-*.jsonl"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "_comment": [
+    "Copy to a file of your own and pass it with --config. Every key is optional.",
+    "MEASURE YOUR OWN DISTRIBUTION BEFORE COPYING THESE NUMBERS. Ours came from the 95th",
+    "percentile of one real day on one machine. A threshold that fires on a third of your",
+    "sessions is a threshold you will mute within a week, and then it protects nothing.",
+    "should_not_run: names of scheduled tasks you believe are DISABLED. If one of them",
+    "shows up burning tokens, that is the loudest finding this tool can produce, and it",
+    "is the finding nothing else in the stack will give you."
+  ],
+  "should_not_run": [
+    "old-nightly-import",
+    "retired-watchdog"
+  ],
+  "huge_day_tokens": 400000000,
+  "single_service_tokens": 25000000,
+  "background_share_warn": 0.45,
+  "background_share_min_tokens": 50000000,
+  "high_frequency_sessions": 20,
+  "disabled_min_tokens": 100000,
+  "context_hog_cache_read": 150000000,
+  "long_session_turns": 700,
+  "top_sessions": 6,
+  "max_flagged_sessions": 3
+}

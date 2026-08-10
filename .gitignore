@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.state/
+*.local.json
+
+# your real roster of paid plans stays yours
+rails.json
