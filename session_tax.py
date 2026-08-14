@@ -34,6 +34,10 @@ VERSION = "1.0.0"
 STATE_DIR = os.path.join(os.path.expanduser("~"), ".llm-spend-audit")
 CAL_PATH = os.path.join(STATE_DIR, "calibration.json")
 
+# Script matters more than length: the same sentence costs ~1.3x more tokens in Cyrillic than
+# in Latin, so a kit that counted characters alone would under-report a Russian-speaking fleet.
+# Ranges are Cyrillic (U+0400-U+04FF) plus Cyrillic Supplement (U+0500-U+052F). Add the script
+# you actually write in; do NOT "clean up" this class -- it is the measurement, not decoration.
 CYRILLIC = re.compile(r"[Ѐ-ӿԀ-ԯ]")
 
 # Used only until you run `calibrate`. Every printout says so, because an uncalibrated

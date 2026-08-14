@@ -26,6 +26,9 @@ import session_tax               # noqa: E402
 import spend_audit               # noqa: E402
 import rail_utilization          # noqa: E402
 
+# The fixture is Cyrillic ON PURPOSE: calibration splits text by script and reports a separate
+# chars-per-token rate for each, so a Latin-only fixture would leave that split untested.
+# Transliterating this line turns two calibration tests red -- verified, not assumed.
 CYR = "тест длинного русского ответа про расход контекста и токены "
 LAT = "a plain english sentence about context and token spend rates "
 CYR_TEXT, LAT_TEXT = CYR * 8, LAT * 8
