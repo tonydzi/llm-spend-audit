@@ -4,9 +4,7 @@
 deterministic instruments that show you how much, who is burning it, and whether the
 subscriptions you already pay for are going undrawn.
 
-No LLM call. No network. No API key. No dependencies. Python 3.8+, stdlib only. It reads
-the transcripts your harness already wrote, which contain the real usage numbers the
-vendor recorded, and does arithmetic on them.
+No LLM call. No network. No API key. No dependencies. Python 3.8+, stdlib only. It reads the transcripts your harness already wrote, which contain the real usage numbers the vendor recorded, and does arithmetic on them in [transcripts.py](transcripts.py).
 
 Built and used daily at [Palo Alto AI Research Lab](https://github.com/tonydzi) across a
 fleet of machines running Claude Code.
@@ -28,12 +26,9 @@ Seven days of our own output tokens, broken down by kind of work:
 cheap coding subscription we were already paying for sat at **4%** of its allowance, and
 two other paid rails had never been measured at all.
 
-We quote the shares and not the absolute total on purpose: that split was taken with a
-per-record counter, before we found the double-count described further down, so the
-proportions hold but the total would be inflated. Saying so is cheaper than being caught.
+We quote the shares and not the absolute total on purpose: that split was taken with a per-record counter, before we found the double-count written up in [docs/GOTCHAS.md](docs/GOTCHAS.md), so the proportions hold but the total would be inflated. Saying so is cheaper than being caught.
 
-Nobody decided this. The model already holding the conversation is always the path of
-least resistance, and no dashboard anywhere was going to say so out loud.
+Nobody decided this. The model already holding the conversation is always the path of least resistance, and no dashboard anywhere was going to say so out loud; the method is in [docs/METHOD.md](docs/METHOD.md).
 
 ## Two axes, and most people only watch one
 
@@ -79,8 +74,7 @@ python spend_audit.py                    # the day that owns tonight
 python spend_audit.py --date 2026-08-09 --config my.json
 ```
 
-Two layers. **By source**, splitting the day between live work and each background service
-or scheduled task. **Carried context**, ranking sessions by prefix times turns, because a
+Two layers. **By source** in [session_tax.py](session_tax.py), splitting the day between live work and each background service or scheduled task. **Carried context**, ranking sessions by prefix times turns, because a
 long session re-ships its whole preamble on every single turn.
 
 Findings from one real day of ours:
@@ -111,8 +105,7 @@ python rail_utilization.py report
 python rail_utilization.py audit         # exit 1 on underuse or a blind spot
 ```
 
-An unused allowance is not a saving, it is a loss you cannot see: the invoice is identical
-whether you drew 5% or 95%. So "we were careful with the expensive vendor" is only true if
+An unused allowance is not a saving, it is a loss you cannot see, and [rail_utilization.py](rail_utilization.py) is the instrument that surfaces it: the invoice is identical whether you drew 5% or 95%. So "we were careful with the expensive vendor" is only true if
 the work went somewhere cheaper. If it went nowhere, you paid full price for an empty
 bucket **and** did the work on the priciest rail you own.
 
@@ -137,8 +130,7 @@ included, and the same `usage` object is **repeated in every transcript record o
 message**. Divide visible text by that number and you get nonsense: our first calibration
 returned 1.2 characters per token for Cyrillic, which is not physically possible.
 
-The fix is two lines. Group by `message.id`, keep only messages whose content blocks are
-all `text`. After it, two machines with different workloads independently measured the same
+The fix is two lines. Group by `message.id`, keep only messages whose content blocks are all `text`, exactly as [transcripts.py](transcripts.py) does. After it, two machines with different workloads independently measured the same
 2.17 characters per token, and a re-run five days later reproduced it.
 
 And it bites twice. We fixed it in the calibration, then an external review panel found
@@ -228,9 +220,7 @@ transcript shape we cannot read is the most useful thing anyone can send us.
 
 ## 🧩 One piece of a working system
 
-This repository is one piece lifted out of a live operation: one non-technical founder, an AI
-cofounder, and a fleet of machines that reach consensus with each other and wake the human only
-for money or the irreversible. It was extracted after it survived production, not written as a
+This repository is one piece lifted out of a live operation mapped in [SYSTEM.md](https://github.com/tonydzi/tonydzi/blob/main/SYSTEM.md): one non-technical founder, an AI cofounder, and a fleet of machines that reach consensus with each other and wake the human only for money or the irreversible. It was extracted after it survived production, not written as a
 demo — and it runs on its own: nothing here phones home to the rest.
 
 **See how the whole thing fits together → [SYSTEM.md](https://github.com/tonydzi/tonydzi/blob/main/SYSTEM.md)**
@@ -239,7 +229,6 @@ demo — and it runs on its own: nothing here phones home to the rest.
 
 ## AI contributors
 
-This project is built by a human + AI team, and the git log says so: Claude writes most of
-the code, Codex and Grok review it, Gemini feeds the research. Each is credited on a commit
+This project is built by a human + AI team, and the git log says so under the rules in [AI-CONTRIBUTORS.md](https://github.com/tonydzi/.github/blob/main/AI-CONTRIBUTORS.md): Claude writes most of the code, Codex and Grok review it, Gemini feeds the research. Each is credited on a commit
 **only if its output changed that commit's content** — no decorative credits. Lab-wide
 policy, one source for every repo: [AI-CONTRIBUTORS.md](https://github.com/tonydzi/.github/blob/main/AI-CONTRIBUTORS.md).
