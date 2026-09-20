@@ -226,9 +226,10 @@ def scan_session(path):
 
 def scheduled_task_name(text):
     """The harness marks an automated run with <scheduled-task name="...">. Returns "" if absent."""
-    if not isinstance(text, str) or "<scheduled-task name=" not in text:
+    marker = '<scheduled-task name="'
+    if not isinstance(text, str) or marker not in text:
         return ""
-    head = text.split('<scheduled-task name="', 1)[1]
+    head = text.split(marker, 1)[1]
     return head.split('"', 1)[0] if '"' in head else ""
 
 

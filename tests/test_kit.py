@@ -243,6 +243,30 @@ class TestBrokenInput(Fixture):
         self.assertEqual(spend_audit.main(["--config", path]), 2)
 
 
+    def test_scheduled_task_marker_without_quote_does_not_crash(self):
+        """Guard and split must look for the SAME literal.
+
+        A transcript that only mentions the marker (prose, a log line, a
+        single-quoted variant) passed the `<scheduled-task name=` guard and then
+        raised IndexError in the split on `<scheduled-task name="`, which killed
+        the scan of every session in the root, not just this one.
+        """
+        path = self.write("prose.jsonl", [
+            {"timestamp": "2026-09-20T10:00:00Z",
+             "message": {"role": "user", "content": text}}
+            for text in ("the harness writes <scheduled-task name= into the prompt",
+                         "<scheduled-task name='nightly'> single quotes",
+                         "<scheduled-task name=")])
+        self.assertEqual(T.scan_session(path)["task"], "")
+
+    def test_scheduled_task_name_is_still_read_when_present(self):
+        path = self.write("real_task.jsonl", [
+            {"timestamp": "2026-09-20T10:00:00Z",
+             "message": {"role": "user",
+                         "content": 'run <scheduled-task name="nightly-sweep"> now'}}])
+        self.assertEqual(T.scan_session(path)["task"], "nightly-sweep")
+
+
 class TestSpendAudit(Fixture):
     def _day(self):
         import datetime
